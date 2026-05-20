@@ -1,15 +1,30 @@
 import { describe, it, expect, beforeAll, afterAll } from 'bun:test';
 import app from '..';
 import { prisma } from '../lib/prisma';
+import { signToken } from '../lib/jwt';
 
 const BASE_URL = 'http://localhost:3000/categories';
 
 describe('/categories', () => {
 	let testCategoryId: string;
+	let authToken: string;
+	let testUserId: string;
 	let createdCategoryIds: string[] = [];
 	let testProductIds: string[] = [];
 
 	beforeAll(async () => {
+		// Create a test admin user
+		const user = await prisma.users.create({
+			data: {
+				name: 'Category Admin',
+				email: `cat_admin_${Date.now()}@example.com`,
+				password: 'password123',
+				role: 'admin',
+			},
+		});
+		testUserId = user.id;
+		authToken = await signToken({ userId: user.id });
+
 		// Create a test category
 		const category = await prisma.categories.create({
 			data: {
@@ -58,6 +73,9 @@ describe('/categories', () => {
 				},
 			});
 		}
+		if (testUserId) {
+			await prisma.users.delete({ where: { id: testUserId } });
+		}
 		if (app.server) await app.stop();
 	});
 
@@ -83,7 +101,10 @@ describe('/categories', () => {
 		const res = await app.handle(
 			new Request(`${BASE_URL}`, {
 				method: 'POST',
-				headers: { 'content-type': 'application/json' },
+				headers: {
+					'content-type': 'application/json',
+					cookie: `auth_token=${authToken}`,
+				},
 				body: JSON.stringify(categoryData),
 			}),
 		);
@@ -98,7 +119,10 @@ describe('/categories', () => {
 		const res = await app.handle(
 			new Request(`${BASE_URL}/${testCategoryId}`, {
 				method: 'PUT',
-				headers: { 'content-type': 'application/json' },
+				headers: {
+					'content-type': 'application/json',
+					cookie: `auth_token=${authToken}`,
+				},
 				body: JSON.stringify(updateData),
 			}),
 		);
@@ -109,11 +133,12 @@ describe('/categories', () => {
 
 	it('DELETE /:id should remove the category', async () => {
 		const category = await prisma.categories.create({
-			data: { name: 'To Delete' },
+			data: { name: `To Delete ${Date.now()}` },
 		});
 		const res = await app.handle(
 			new Request(`${BASE_URL}/${category.id}`, {
 				method: 'DELETE',
+				headers: { cookie: `auth_token=${authToken}` },
 			}),
 		);
 		expect(res.status).toBe(204);
@@ -129,9 +154,7 @@ describe('/categories', () => {
 	});
 
 	it('GET /:id/products should support sorting (price desc)', async () => {
-		const res = await app.handle(
-			new Request(`${BASE_URL}/${testCategoryId}/products?sortBy=price&sortOrder=desc`),
-		);
+		const res = await app.handle(new Request(`${BASE_URL}/${testCategoryId}/products?sortBy=price&sortOrder=desc`));
 		expect(res.status).toBe(200);
 		const body = (await res.json()) as any;
 		expect(body.data[0].name).toBe('Product B'); // 20 > 10
@@ -139,9 +162,7 @@ describe('/categories', () => {
 	});
 
 	it('GET /:id/products should support pagination', async () => {
-		const res = await app.handle(
-			new Request(`${BASE_URL}/${testCategoryId}/products?limit=1`),
-		);
+		const res = await app.handle(new Request(`${BASE_URL}/${testCategoryId}/products?limit=1`));
 		expect(res.status).toBe(200);
 		const body = (await res.json()) as any;
 		expect(body.data.length).toBe(1);

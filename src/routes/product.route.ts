@@ -2,6 +2,8 @@ import { Elysia } from 'elysia';
 import { prisma } from '../lib/prisma';
 import { ProductBodySchema, ProductEditSchema, ProductParamsSchema, ProductQuerySchema } from '../lib/validation';
 import { NotFoundError } from '../lib/error';
+import { authPlugin, isAdmin } from '../lib/auth';
+import { LogAction, recordLog } from '../lib/logger';
 
 const productRoute = new Elysia({ prefix: '/products' })
 	.get(
@@ -13,28 +15,6 @@ const productRoute = new Elysia({ prefix: '/products' })
 				throw new NotFoundError('Product not found');
 			}
 			return { data: product };
-		},
-		{ params: ProductParamsSchema },
-	)
-	.put(
-		'/:id',
-		async ({ params: { id }, body }) => {
-			const product = await prisma.products.update({
-				where: { id: id },
-				data: body,
-			});
-			return { data: product };
-		},
-		{
-			params: ProductParamsSchema,
-			body: ProductEditSchema,
-		},
-	)
-	.delete(
-		'/:id',
-		async ({ params: { id }, set }) => {
-			await prisma.products.delete({ where: { id: id } });
-			set.status = 204;
 		},
 		{ params: ProductParamsSchema },
 	)
@@ -58,17 +38,69 @@ const productRoute = new Elysia({ prefix: '/products' })
 		},
 		{ query: ProductQuerySchema },
 	)
-	.post(
-		'/',
-		async ({ body, set }) => {
-			const product = await prisma.products.create({
-				data: body,
-			});
+	.group('', (app) =>
+		app
+			.use(isAdmin)
+			.post(
+				'/',
+				async ({ body, set, user, request, headers }) => {
+					const currentUser = user!;
+					const product = await prisma.products.create({
+						data: body,
+					});
 
-			set.status = 201;
-			return { data: product };
-		},
-		{ body: ProductBodySchema },
+					await recordLog({
+						userId: currentUser.id,
+						action: LogAction.PRODUCT_CREATE,
+						request,
+						headers,
+					});
+
+					set.status = 201;
+					return { data: product };
+				},
+				{ body: ProductBodySchema },
+			)
+			.put(
+				'/:id',
+				async ({ params: { id }, body, user, request, headers }) => {
+					const currentUser = user!;
+					const product = await prisma.products.update({
+						where: { id: id },
+						data: body,
+					});
+
+					await recordLog({
+						userId: currentUser.id,
+						action: LogAction.PRODUCT_UPDATE,
+						request,
+						headers,
+					});
+
+					return { data: product };
+				},
+				{
+					params: ProductParamsSchema,
+					body: ProductEditSchema,
+				},
+			)
+			.delete(
+				'/:id',
+				async ({ params: { id }, set, user, request, headers }) => {
+					const currentUser = user!;
+					await prisma.products.delete({ where: { id: id } });
+
+					await recordLog({
+						userId: currentUser.id,
+						action: LogAction.PRODUCT_DELETE,
+						request,
+						headers,
+					});
+
+					set.status = 204;
+				},
+				{ params: ProductParamsSchema },
+			),
 	);
 
 export default productRoute;

@@ -1,13 +1,9 @@
 import { Elysia } from 'elysia';
 import { prisma } from '../lib/prisma';
-import {
-	CategoryBodySchema,
-	CategoryEditSchema,
-	CategoryParamsSchema,
-	CategoryProductQuerySchema,
-	CategoryQuerySchema,
-} from '../lib/validation';
+import { CategoryBodySchema, CategoryEditSchema, CategoryParamsSchema, CategoryProductQuerySchema, CategoryQuerySchema } from '../lib/validation';
 import { NotFoundError } from '../lib/error';
+import { authPlugin, isAdmin } from '../lib/auth';
+import { LogAction, recordLog } from '../lib/logger';
 
 const categoryRoute = new Elysia({ prefix: '/categories' })
 	.get(
@@ -32,39 +28,6 @@ const categoryRoute = new Elysia({ prefix: '/categories' })
 		},
 		{ params: CategoryParamsSchema },
 	)
-	.post(
-		'/',
-		async ({ body, set }) => {
-			const category = await prisma.categories.create({
-				data: body,
-			});
-			set.status = 201;
-			return { data: category };
-		},
-		{ body: CategoryBodySchema },
-	)
-	.put(
-		'/:id',
-		async ({ params: { id }, body }) => {
-			const category = await prisma.categories.update({
-				where: { id },
-				data: body,
-			});
-			return { data: category };
-		},
-		{
-			params: CategoryParamsSchema,
-			body: CategoryEditSchema,
-		},
-	)
-	.delete(
-		'/:id',
-		async ({ params: { id }, set }) => {
-			await prisma.categories.delete({ where: { id } });
-			set.status = 204;
-		},
-		{ params: CategoryParamsSchema },
-	)
 	.get(
 		'/:id/products',
 		async ({ params: { id }, query: { skip, limit, sortBy, sortOrder } }) => {
@@ -86,6 +49,70 @@ const categoryRoute = new Elysia({ prefix: '/categories' })
 			params: CategoryParamsSchema,
 			query: CategoryProductQuerySchema,
 		},
+	)
+	.group('', (app) =>
+		app
+			.use(isAdmin)
+			.post(
+				'/',
+				async ({ body, set, user, request, headers }) => {
+					const currentUser = user!;
+					const category = await prisma.categories.create({
+						data: body,
+					});
+
+					await recordLog({
+						userId: currentUser.id,
+						action: LogAction.CATEGORY_CREATE,
+						request,
+						headers,
+					});
+
+					set.status = 201;
+					return { data: category };
+				},
+				{ body: CategoryBodySchema },
+			)
+			.put(
+				'/:id',
+				async ({ params: { id }, body, user, request, headers }) => {
+					const currentUser = user!;
+					const category = await prisma.categories.update({
+						where: { id },
+						data: body,
+					});
+
+					await recordLog({
+						userId: currentUser.id,
+						action: LogAction.CATEGORY_UPDATE,
+						request,
+						headers,
+					});
+
+					return { data: category };
+				},
+				{
+					params: CategoryParamsSchema,
+					body: CategoryEditSchema,
+				},
+			)
+			.delete(
+				'/:id',
+				async ({ params: { id }, set, user, request, headers }) => {
+					const currentUser = user!;
+					await prisma.categories.delete({ where: { id } });
+
+					await recordLog({
+						userId: currentUser.id,
+						action: LogAction.CATEGORY_DELETE,
+						request,
+						headers,
+					});
+
+					set.status = 204;
+				},
+				{ params: CategoryParamsSchema },
+			),
 	);
 
 export default categoryRoute;

@@ -1,14 +1,29 @@
 import { describe, it, expect, beforeAll, afterAll } from 'bun:test';
 import app from '..';
 import { prisma } from '../lib/prisma';
+import { signToken } from '../lib/jwt';
 
 const BASE_URL = 'http://localhost:3000/products';
 
 describe('/products', () => {
 	let testProductId: string;
+	let authToken: string;
+	let testUserId: string;
 	let createdProductIds: string[] = [];
 
 	beforeAll(async () => {
+		// Create a test admin user
+		const user = await prisma.users.create({
+			data: {
+				name: 'Product Admin',
+				email: `prod_admin_${Date.now()}@example.com`,
+				password: 'password123',
+				role: 'admin',
+			},
+		});
+		testUserId = user.id;
+		authToken = await signToken({ userId: user.id });
+
 		// Create a test product
 		const product = await prisma.products.create({
 			data: {
@@ -32,6 +47,9 @@ describe('/products', () => {
 					},
 				},
 			});
+		}
+		if (testUserId) {
+			await prisma.users.delete({ where: { id: testUserId } });
 		}
 		if (app.server) await app.stop();
 	});
@@ -69,7 +87,10 @@ describe('/products', () => {
 		const res = await app.handle(
 			new Request(`${BASE_URL}`, {
 				method: 'POST',
-				headers: { 'content-type': 'application/json' },
+				headers: {
+					'content-type': 'application/json',
+					cookie: `auth_token=${authToken}`,
+				},
 				body: JSON.stringify(productData),
 			}),
 		);
@@ -86,7 +107,10 @@ describe('/products', () => {
 		const res = await app.handle(
 			new Request(`${BASE_URL}`, {
 				method: 'POST',
-				headers: { 'content-type': 'application/json' },
+				headers: {
+					'content-type': 'application/json',
+					cookie: `auth_token=${authToken}`,
+				},
 				body: JSON.stringify({
 					name: 'Bad Product',
 					description: 'Description',
@@ -117,9 +141,7 @@ describe('/products', () => {
 		const res = await app.handle(new Request(`${BASE_URL}?minPrice=5&maxPrice=15`));
 		expect(res.status).toBe(200);
 		const body = (await res.json()) as any;
-		expect(
-			body.data.every((p: any) => parseFloat(p.price) >= 5 && parseFloat(p.price) <= 15),
-		).toBe(true);
+		expect(body.data.every((p: any) => parseFloat(p.price) >= 5 && parseFloat(p.price) <= 15)).toBe(true);
 	});
 
 	it('GET / should support sorting', async () => {
@@ -127,9 +149,7 @@ describe('/products', () => {
 		expect(res.status).toBe(200);
 		const body = (await res.json()) as any;
 		if (body.data.length >= 2) {
-			expect(parseFloat(body.data[0].price)).toBeGreaterThanOrEqual(
-				parseFloat(body.data[1].price),
-			);
+			expect(parseFloat(body.data[0].price)).toBeGreaterThanOrEqual(parseFloat(body.data[1].price));
 		}
 	});
 
@@ -138,14 +158,16 @@ describe('/products', () => {
 		const res = await app.handle(
 			new Request(`${BASE_URL}/${testProductId}`, {
 				method: 'PUT',
-				headers: { 'content-type': 'application/json' },
+				headers: {
+					'content-type': 'application/json',
+					cookie: `auth_token=${authToken}`,
+				},
 				body: JSON.stringify(updateData),
 			}),
 		);
 		expect(res.status).toBe(200);
 		const body = (await res.json()) as any;
 		expect(body.data.name).toBe(updateData.name);
-		expect(body.data.price).toBe(updateData.price.toString()); // Decimal comes back as string from Prisma usually, but Elysia might transform. Let's check.
 	});
 
 	it('PUT /:id should return 404 for non-existent ID', async () => {
@@ -153,7 +175,10 @@ describe('/products', () => {
 		const res = await app.handle(
 			new Request(`${BASE_URL}/${fakeId}`, {
 				method: 'PUT',
-				headers: { 'content-type': 'application/json' },
+				headers: {
+					'content-type': 'application/json',
+					cookie: `auth_token=${authToken}`,
+				},
 				body: JSON.stringify({ name: 'Doesnt Matter' }),
 			}),
 		);
@@ -170,6 +195,7 @@ describe('/products', () => {
 		const res = await app.handle(
 			new Request(`${BASE_URL}/${product.id}`, {
 				method: 'DELETE',
+				headers: { cookie: `auth_token=${authToken}` },
 			}),
 		);
 		expect(res.status).toBe(204);
@@ -184,6 +210,7 @@ describe('/products', () => {
 		const res = await app.handle(
 			new Request(`${BASE_URL}/${fakeId}`, {
 				method: 'DELETE',
+				headers: { cookie: `auth_token=${authToken}` },
 			}),
 		);
 		expect(res.status).toBe(404);

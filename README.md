@@ -5,6 +5,7 @@
 `laptop-website-api` is a RESTful API backend designed to serve frontend applications (e.g., e-commerce platforms selling laptops or general tech products). Built with modern web technologies, it provides all the necessary endpoints to manage products, users, categories, shopping carts, and orders.
 
 ### Tech Stack
+
 - Framework: **[ElysiaJS](https://elysiajs.com/)**
 - Runtime: **[Bun](https://bun.sh/)**
 - Database: **[Neon](https://neon.com/)**
@@ -35,20 +36,22 @@
 ## Getting Started
 
 ### Prerequisites
+
 - **[Bun](https://bun.sh/)** v1.0.0 or higher.
 - A PostgreSQL database (e.g., [Neon](https://neon.tech/)).
 
 ### Installation
 
 1. Clone the repository and install dependencies:
-   ```bash
-   bun install
-   ```
+
+    ```bash
+    bun install
+    ```
 
 2. Set up your environment variables by creating a `.env` file in the root directory:
-   ```env
-   DATABASE_URL="postgres://user:password@host/database"
-   ```
+    ```env
+    DATABASE_URL="postgres://user:password@host/database"
+    ```
 
 ### Development
 

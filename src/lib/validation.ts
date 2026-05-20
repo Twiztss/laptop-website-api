@@ -49,6 +49,11 @@ export const UserBodySchema = t.Object({
 
 export const UserEditSchema = t.Partial(UserBodySchema);
 
+export const LoginSchema = t.Object({
+	email: t.String({ format: 'email' }),
+	password: t.String(),
+});
+
 export const CategoryParamsSchema = t.Object({
 	id: t.String({ format: 'uuid' }),
 });

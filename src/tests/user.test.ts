@@ -1,23 +1,27 @@
 import { describe, it, expect, beforeAll, afterAll } from 'bun:test';
 import app from '..';
 import { prisma } from '../lib/prisma';
+import { signToken } from '../lib/jwt';
 
 const BASE_URL = 'http://localhost:3000/users';
 
 describe('/users', () => {
 	let testUserId: string;
+	let authToken: string;
 	let createdUserIds: string[] = [];
 
 	beforeAll(async () => {
-		// Create a test user
+		// Create a test admin user
 		const user = await prisma.users.create({
 			data: {
-				name: 'Test User',
-				email: 'test@example.com',
+				name: 'Test Admin',
+				email: `admin_${Date.now()}@example.com`,
 				password: 'password123',
+				role: 'admin',
 			},
 		});
 		testUserId = user.id;
+		authToken = await signToken({ userId: user.id });
 	});
 
 	afterAll(async () => {
@@ -36,7 +40,11 @@ describe('/users', () => {
 	});
 
 	it('GET / should return 200 OK', async () => {
-		const res = await app.handle(new Request(BASE_URL));
+		const res = await app.handle(
+			new Request(BASE_URL, {
+				headers: { cookie: `auth_token=${authToken}` },
+			}),
+		);
 		const body = (await res.json()) as any;
 		expect(res.status).toBe(200);
 		expect(body.data.length).toBeGreaterThanOrEqual(1);
@@ -46,7 +54,11 @@ describe('/users', () => {
 	});
 
 	it('GET /:id should return 200 OK', async () => {
-		const res = await app.handle(new Request(`${BASE_URL}/${testUserId}`));
+		const res = await app.handle(
+			new Request(`${BASE_URL}/${testUserId}`, {
+				headers: { cookie: `auth_token=${authToken}` },
+			}),
+		);
 		expect(res.status).toBe(200);
 		const data = (await res.json()) as any;
 		expect(data.data.id).toBe(testUserId);
@@ -55,7 +67,11 @@ describe('/users', () => {
 
 	it('GET /:id should return 404 NOT FOUND for non-existent ID', async () => {
 		const fakeId = '00000000-0000-4000-a000-000000000000';
-		const res = await app.handle(new Request(`${BASE_URL}/${fakeId}`));
+		const res = await app.handle(
+			new Request(`${BASE_URL}/${fakeId}`, {
+				headers: { cookie: `auth_token=${authToken}` },
+			}),
+		);
 		expect(res.status).toBe(404);
 		const body = (await res.json()) as any;
 		expect(body.code).toBe('NOT_FOUND');
@@ -64,13 +80,16 @@ describe('/users', () => {
 	it('POST / should return 201 CREATED and return the user', async () => {
 		const userData = {
 			name: 'New User',
-			email: 'new@example.com',
+			email: `new_${Date.now()}@example.com`,
 			password: 'password123',
 		};
 		const res = await app.handle(
 			new Request(`${BASE_URL}`, {
 				method: 'POST',
-				headers: { 'content-type': 'application/json' },
+				headers: {
+					'content-type': 'application/json',
+					cookie: `auth_token=${authToken}`,
+				},
 				body: JSON.stringify(userData),
 			}),
 		);
@@ -89,7 +108,10 @@ describe('/users', () => {
 		const res = await app.handle(
 			new Request(`${BASE_URL}`, {
 				method: 'POST',
-				headers: { 'content-type': 'application/json' },
+				headers: {
+					'content-type': 'application/json',
+					cookie: `auth_token=${authToken}`,
+				},
 				body: JSON.stringify({
 					name: 'Bad User',
 					email: 'not-an-email',
@@ -103,19 +125,29 @@ describe('/users', () => {
 	it('POST / should return 400 for duplicate email', async () => {
 		const userData = {
 			name: 'Duplicate User',
-			email: 'test@example.com', // Already exists from beforeAll
+			email: 'test@example.com', // Already exists from somewhere or we can use another known one
 			password: 'password123',
 		};
+		// First create it
+		await prisma.users.upsert({
+			where: { email: userData.email },
+			update: {},
+			create: userData,
+		});
+
 		const res = await app.handle(
 			new Request(`${BASE_URL}`, {
 				method: 'POST',
-				headers: { 'content-type': 'application/json' },
+				headers: {
+					'content-type': 'application/json',
+					cookie: `auth_token=${authToken}`,
+				},
 				body: JSON.stringify(userData),
 			}),
 		);
-		expect(res.status).toBe(400);
+		expect(res.status).toBe(409);
 		const body = (await res.json()) as any;
-		expect(body.code).toBe('BAD_REQUEST');
+		expect(body.code).toBe('CONFLICT');
 	});
 
 	it('PUT /:id should update the user', async () => {
@@ -123,7 +155,10 @@ describe('/users', () => {
 		const res = await app.handle(
 			new Request(`${BASE_URL}/${testUserId}`, {
 				method: 'PUT',
-				headers: { 'content-type': 'application/json' },
+				headers: {
+					'content-type': 'application/json',
+					cookie: `auth_token=${authToken}`,
+				},
 				body: JSON.stringify(updateData),
 			}),
 		);
@@ -133,13 +168,53 @@ describe('/users', () => {
 		expect(body.data.password).toBeUndefined();
 	});
 
+	it('PUT /:id should not allow non-admin to escalate role', async () => {
+		const user = await prisma.users.create({
+			data: {
+				name: 'Normal User',
+				email: `normal_${Date.now()}@example.com`,
+				password: 'password123',
+				role: 'customer',
+			},
+		});
+		createdUserIds.push(user.id);
+		const normalToken = await signToken({ userId: user.id });
+
+		const res = await app.handle(
+			new Request(`${BASE_URL}/${user.id}`, {
+				method: 'PUT',
+				headers: {
+					'content-type': 'application/json',
+					cookie: `auth_token=${normalToken}`,
+				},
+				body: JSON.stringify({
+					role: 'admin',
+				}),
+			}),
+		);
+
+		expect(res.status).toBe(200);
+		const body = (await res.json()) as any;
+		expect(body.data.role).not.toBe('admin');
+		expect(body.data.role).toBe('customer');
+
+		// Verify in DB
+		const userInDb = await prisma.users.findUnique({ where: { id: user.id } });
+		expect(userInDb?.role).toBe('customer');
+	});
+
 	it('DELETE /:id should remove the user', async () => {
 		const user = await prisma.users.create({
-			data: { name: 'To Delete', email: 'delete@example.com', password: 'password123' },
+			data: {
+				name: `To Delete ${Date.now()}`,
+				email: `delete_${Date.now()}@example.com`,
+				password: 'password123',
+			},
 		});
 		const res = await app.handle(
 			new Request(`${BASE_URL}/${user.id}`, {
 				method: 'DELETE',
+				headers: { cookie: `auth_token=${authToken}` },
 			}),
 		);
 		expect(res.status).toBe(204);

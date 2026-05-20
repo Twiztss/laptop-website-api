@@ -14,61 +14,60 @@ export class BadRequestError extends Error {
 	}
 }
 
+export class UnauthorizedError extends Error {
+	constructor(message: string = 'Unauthorized') {
+		super(message);
+		this.name = 'UnauthorizedError';
+	}
+}
+
 export const errorHandler: ErrorHandler<{
 	NotFoundError: NotFoundError;
 	BadRequestError: BadRequestError;
+	UnauthorizedError: UnauthorizedError;
 }> = ({ code, error, set }) => {
-	// Handle Prisma errors (simplified)
+	// Standardized error response structure
+	const errorResponse = (status: number, errorCode: string, message: string, errors?: any) => {
+		set.status = status;
+		return {
+			status,
+			code: errorCode,
+			message,
+			...(errors && { errors }),
+		};
+	};
+
+	// Handle Prisma errors
 	if (error && typeof error === 'object' && 'code' in error) {
-		if (error.code === 'P2025') {
-			set.status = 404;
-			return {
-				status: 404,
-				code: 'NOT_FOUND',
-				message: 'Resource not found',
-			};
-		}
-		if (error.code === 'P2002') {
-			set.status = 400;
-			return {
-				status: 400,
-				code: 'BAD_REQUEST',
-				message: 'Unique constraint failed. Resource already exists.',
-			};
+		const prismaError = error as { code: string; meta?: any; message: string };
+		switch (prismaError.code) {
+			case 'P2025': // Record not found
+				return errorResponse(404, 'NOT_FOUND', 'Resource not found');
+			case 'P2002': // Unique constraint failed
+				const target = prismaError.meta?.target || 'Resource';
+				return errorResponse(409, 'CONFLICT', `${target} already exists`);
+			case 'P2003': // Foreign key constraint failed
+				return errorResponse(400, 'BAD_REQUEST', 'Foreign key constraint failed');
 		}
 	}
 
 	switch (code) {
 		case 'NOT_FOUND':
 		case 'NotFoundError':
-			set.status = 404;
-			return {
-				status: 404,
-				code: 'NOT_FOUND',
-				message: error.message,
-			};
+			return errorResponse(404, 'NOT_FOUND', error.message || 'Resource not found');
 		case 'VALIDATION':
-			set.status = 422;
-			return {
-				status: 422,
-				code: 'VALIDATION_ERROR',
-				message: 'Validation failed',
-				errors: (error as ValidationError).all || [], // Casting here is often necessary as VALIDATION error types are complex
-			};
+			const validationError = error as ValidationError;
+			return errorResponse(422, 'VALIDATION_ERROR', 'Validation failed', validationError.all || []);
 		case 'BadRequestError':
-			set.status = 400;
-			return {
-				status: 400,
-				code: 'BAD_REQUEST',
-				message: error.message,
-			};
+			return errorResponse(400, 'BAD_REQUEST', error.message || 'Bad request');
+		case 'UnauthorizedError':
+			return errorResponse(401, 'UNAUTHORIZED', error.message || 'Unauthorized');
+		case 'PARSE':
+			return errorResponse(400, 'PARSE_ERROR', 'Invalid request body');
+		case 'INVALID_COOKIE_SIGNATURE':
+			return errorResponse(401, 'UNAUTHORIZED', 'Invalid session');
 		default:
-			set.status = 500;
 			console.error('Unhandled Error:', error);
-			return {
-				status: 500,
-				code: 'INTERNAL_SERVER_ERROR',
-				message: (error as InternalServerError).message || 'An unexpected error occurred',
-			};
+			return errorResponse(500, 'INTERNAL_SERVER_ERROR', 'An unexpected error occurred');
 	}
 };
