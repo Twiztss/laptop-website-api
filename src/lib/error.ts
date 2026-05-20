@@ -19,13 +19,23 @@ export const errorHandler: ErrorHandler<{
 	BadRequestError: BadRequestError;
 }> = ({ code, error, set }) => {
 	// Handle Prisma errors (simplified)
-	if (error && typeof error === 'object' && 'code' in error && error.code === 'P2025') {
-		set.status = 404;
-		return {
-			status: 404,
-			code: 'NOT_FOUND',
-			message: 'Resource not found',
-		};
+	if (error && typeof error === 'object' && 'code' in error) {
+		if (error.code === 'P2025') {
+			set.status = 404;
+			return {
+				status: 404,
+				code: 'NOT_FOUND',
+				message: 'Resource not found',
+			};
+		}
+		if (error.code === 'P2002') {
+			set.status = 400;
+			return {
+				status: 400,
+				code: 'BAD_REQUEST',
+				message: 'Unique constraint failed. Resource already exists.',
+			};
+		}
 	}
 
 	switch (code) {

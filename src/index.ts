@@ -1,6 +1,7 @@
 import { Elysia } from 'elysia';
 import productRoute from './routes/product.route';
 import userRoute from './routes/user.route';
+import categoryRoute from './routes/category.route';
 import { BadRequestError, errorHandler, NotFoundError } from './lib/error';
 
 const app = new Elysia()
@@ -12,6 +13,7 @@ const app = new Elysia()
 	.onError(errorHandler)
 	.use(productRoute)
 	.use(userRoute)
+	.use(categoryRoute)
 	.get('/', () => 'Hello Elysia')
 	.listen(3000);
 

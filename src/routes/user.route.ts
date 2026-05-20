@@ -41,48 +41,34 @@ const userRoute = new Elysia({ prefix: '/users' })
 	.post(
 		'/',
 		async ({ body, set }) => {
-			try {
-				const hashedPassword = await Bun.password.hash(body.password);
-				const user = await prisma.users.create({
-					data: {
-						...body,
-						password: hashedPassword,
-					},
-					select: userSelect,
-				});
+			const hashedPassword = await Bun.password.hash(body.password);
+			const user = await prisma.users.create({
+				data: {
+					...body,
+					password: hashedPassword,
+				},
+				select: userSelect,
+			});
 
-				set.status = 201;
-				return { data: user };
-			} catch (error: any) {
-				if (error.code === 'P2002') {
-					throw new BadRequestError('User with this email or name already exists');
-				}
-				throw error;
-			}
+			set.status = 201;
+			return { data: user };
 		},
 		{ body: UserBodySchema },
 	)
 	.put(
 		'/:id',
 		async ({ params: { id }, body }) => {
-			try {
-				const updateData = { ...body };
-				if (updateData.password) {
-					updateData.password = await Bun.password.hash(updateData.password);
-				}
-
-				const user = await prisma.users.update({
-					where: { id },
-					data: updateData,
-					select: userSelect,
-				});
-				return { data: user };
-			} catch (error: any) {
-				if (error.code === 'P2002') {
-					throw new BadRequestError('User with this email or name already exists');
-				}
-				throw error;
+			const updateData = { ...body };
+			if (updateData.password) {
+				updateData.password = await Bun.password.hash(updateData.password);
 			}
+
+			const user = await prisma.users.update({
+				where: { id },
+				data: updateData,
+				select: userSelect,
+			});
+			return { data: user };
 		},
 		{
 			params: UserParamsSchema,

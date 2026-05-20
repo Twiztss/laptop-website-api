@@ -40,10 +40,19 @@ const productRoute = new Elysia({ prefix: '/products' })
 	)
 	.get(
 		'/',
-		async ({ query: { skip, limit } }) => {
+		async ({ query: { skip, limit, name, categoryId, minPrice, maxPrice, sortBy, sortOrder } }) => {
 			const products = await prisma.products.findMany({
+				where: {
+					name: name ? { contains: name, mode: 'insensitive' } : undefined,
+					category_id: categoryId,
+					price: {
+						gte: minPrice,
+						lte: maxPrice,
+					},
+				},
 				skip: skip ?? 0,
 				take: limit ?? 10,
+				orderBy: sortBy ? { [sortBy]: sortOrder ?? 'asc' } : undefined,
 			});
 			return { data: products };
 		},
@@ -53,12 +62,7 @@ const productRoute = new Elysia({ prefix: '/products' })
 		'/',
 		async ({ body, set }) => {
 			const product = await prisma.products.create({
-				data: {
-					name: body.name,
-					description: body.description,
-					price: body.price,
-					stock: body.stock,
-				},
+				data: body,
 			});
 
 			set.status = 201;

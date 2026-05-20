@@ -106,6 +106,33 @@ describe('/products', () => {
 		expect(res2.status).toBe(422);
 	});
 
+	it('GET / should filter by name', async () => {
+		const res = await app.handle(new Request(`${BASE_URL}?name=Test`));
+		expect(res.status).toBe(200);
+		const body = (await res.json()) as any;
+		expect(body.data.every((p: any) => p.name.includes('Test'))).toBe(true);
+	});
+
+	it('GET / should filter by price range', async () => {
+		const res = await app.handle(new Request(`${BASE_URL}?minPrice=5&maxPrice=15`));
+		expect(res.status).toBe(200);
+		const body = (await res.json()) as any;
+		expect(
+			body.data.every((p: any) => parseFloat(p.price) >= 5 && parseFloat(p.price) <= 15),
+		).toBe(true);
+	});
+
+	it('GET / should support sorting', async () => {
+		const res = await app.handle(new Request(`${BASE_URL}?sortBy=price&sortOrder=desc`));
+		expect(res.status).toBe(200);
+		const body = (await res.json()) as any;
+		if (body.data.length >= 2) {
+			expect(parseFloat(body.data[0].price)).toBeGreaterThanOrEqual(
+				parseFloat(body.data[1].price),
+			);
+		}
+	});
+
 	it('PUT /:id should update the product', async () => {
 		const updateData = { name: 'Updated Name', price: 99.99 };
 		const res = await app.handle(

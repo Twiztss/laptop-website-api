@@ -7,6 +7,12 @@ export const ProductParamsSchema = t.Object({
 export const ProductQuerySchema = t.Object({
 	skip: t.Optional(t.Numeric({ minimum: 0 })),
 	limit: t.Optional(t.Numeric({ minimum: 1, maximum: 100 })),
+	name: t.Optional(t.String()),
+	categoryId: t.Optional(t.String({ format: 'uuid' })),
+	minPrice: t.Optional(t.Numeric({ minimum: 0 })),
+	maxPrice: t.Optional(t.Numeric({ minimum: 0 })),
+	sortBy: t.Optional(t.String({ pattern: '^(name|price|stock|created_at)$' })),
+	sortOrder: t.Optional(t.String({ pattern: '^(asc|desc)$' })),
 });
 
 export const ProductBodySchema = t.Object({
@@ -14,6 +20,7 @@ export const ProductBodySchema = t.Object({
 	description: t.Optional(t.String()),
 	price: t.Number({ minimum: 0 }),
 	stock: t.Integer({ minimum: 0 }),
+	category_id: t.Optional(t.String({ format: 'uuid' })),
 });
 
 export const ProductEditSchema = t.Object({
@@ -21,6 +28,7 @@ export const ProductEditSchema = t.Object({
 	description: t.Optional(t.String()),
 	price: t.Optional(t.Number({ minimum: 0 })),
 	stock: t.Optional(t.Integer({ minimum: 0 })),
+	category_id: t.Optional(t.String({ format: 'uuid' })),
 });
 
 export const UserParamsSchema = t.Object({
@@ -40,3 +48,26 @@ export const UserBodySchema = t.Object({
 });
 
 export const UserEditSchema = t.Partial(UserBodySchema);
+
+export const CategoryParamsSchema = t.Object({
+	id: t.String({ format: 'uuid' }),
+});
+
+export const CategoryQuerySchema = t.Object({
+	skip: t.Optional(t.Numeric({ minimum: 0 })),
+	limit: t.Optional(t.Numeric({ minimum: 1, maximum: 100 })),
+});
+
+export const CategoryBodySchema = t.Object({
+	name: t.String({ minLength: 1, maxLength: 100 }),
+	description: t.Optional(t.String()),
+});
+
+export const CategoryEditSchema = t.Partial(CategoryBodySchema);
+
+export const CategoryProductQuerySchema = t.Object({
+	skip: t.Optional(t.Numeric({ minimum: 0 })),
+	limit: t.Optional(t.Numeric({ minimum: 1, maximum: 100 })),
+	sortBy: t.Optional(t.String({ pattern: '^(name|price|stock|created_at)$' })),
+	sortOrder: t.Optional(t.String({ pattern: '^(asc|desc)$' })),
+});
