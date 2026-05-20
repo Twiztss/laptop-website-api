@@ -1,0 +1,14 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+
+# Prisma artifacts (auto-generated migrations should never be formatted)
+prisma/migrations/
+prisma/generated/
+
+# Environment variables and logs
+.env
+*.log

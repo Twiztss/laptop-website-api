@@ -1,0 +1,21 @@
+{
+	"name": "cyrene-eshop",
+	"version": "1.0.50",
+	"scripts": {
+		"test": "echo \"Error: no test specified\" && exit 1",
+		"dev": "bun run --watch src/index.ts"
+	},
+	"dependencies": {
+		"@prisma/adapter-neon": "^7.8.0",
+		"@prisma/client": "^7.8.0",
+		"dotenv": "^17.4.2",
+		"elysia": "latest"
+	},
+	"devDependencies": {
+		"bun-types": "latest",
+		"prettier": "^3.8.3",
+		"prisma": "^7.8.0",
+		"tsx": "^4.22.2"
+	},
+	"module": "src/index.js"
+}

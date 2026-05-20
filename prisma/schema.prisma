@@ -1,0 +1,96 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model cart_items {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  cart_id    String?   @db.Uuid
+  product_id String?   @db.Uuid
+  quantity   Int       @default(1)
+  created_at DateTime? @default(now()) @db.Timestamp(6)
+  carts      carts?    @relation(fields: [cart_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  products   products? @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([cart_id, product_id])
+}
+
+model carts {
+  id         String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id    String?      @unique @db.Uuid
+  created_at DateTime?    @default(now()) @db.Timestamp(6)
+  cart_items cart_items[]
+  users      users?       @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model categories {
+  id          String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String     @unique @db.VarChar(100)
+  description String?
+  created_at  DateTime?  @default(now()) @db.Timestamp(6)
+  products    products[]
+}
+
+model logs {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id    String?   @db.Uuid
+  action     String    @db.VarChar(255)
+  ip_address String?   @db.VarChar(50)
+  user_agent String?
+  created_at DateTime? @default(now()) @db.Timestamp(6)
+  users      users?    @relation(fields: [user_id], references: [id], onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model order_items {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  order_id          String?   @db.Uuid
+  product_id        String?   @db.Uuid
+  quantity          Int       @default(1)
+  price_at_purchase Decimal   @db.Decimal(10, 2)
+  created_at        DateTime? @default(now()) @db.Timestamp(6)
+  orders            orders?   @relation(fields: [order_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  products          products? @relation(fields: [product_id], references: [id], onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model orders {
+  id          String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id     String?       @db.Uuid
+  total       Decimal       @db.Decimal(10, 2)
+  status      String?       @default("pending") @db.VarChar(50)
+  created_at  DateTime?     @default(now()) @db.Timestamp(6)
+  order_items order_items[]
+  users       users?        @relation(fields: [user_id], references: [id], onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model products {
+  id          String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String        @db.VarChar(100)
+  description String?
+  price       Decimal       @db.Decimal(10, 2)
+  stock       Int           @default(0)
+  category_id String?       @db.Uuid
+  created_at  DateTime?     @default(now()) @db.Timestamp(6)
+  cart_items  cart_items[]
+  order_items order_items[]
+  categories  categories?   @relation(fields: [category_id], references: [id], onUpdate: NoAction)
+}
+
+model users {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name       String    @unique(map: "unique_name") @db.VarChar(100)
+  email      String    @unique @db.VarChar(100)
+  password   String
+  role       String?   @default("customer") @db.VarChar(20)
+  created_at DateTime? @default(now()) @db.Timestamp(6)
+  carts      carts?
+  logs       logs[]
+  orders     orders[]
+}
