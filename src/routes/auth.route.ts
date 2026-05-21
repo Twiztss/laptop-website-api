@@ -18,7 +18,10 @@ const authRoute = new Elysia({ prefix: '/auth' })
 		'/register',
 		async ({ body, set, cookie: { auth_token }, request, headers }) => {
 			const { role, password, ...userData } = body;
-			const hashedPassword = await Bun.password.hash(password);
+			const hashedPassword = await Bun.password.hash(password, {
+				algorithm: 'bcrypt',
+				cost: 10,
+			});
 
 			const user = await prisma.users.create({
 				data: {
@@ -61,7 +64,13 @@ const authRoute = new Elysia({ prefix: '/auth' })
 				where: { email: body.email },
 			});
 
-			if (!user || !(await Bun.password.verify(body.password, user.password))) {
+			// Prevent timing attack username enumeration
+			if (!user) {
+				await Bun.password.hash(body.password, { algorithm: 'bcrypt', cost: 10 });
+				throw new UnauthorizedError('Invalid email or password');
+			}
+
+			if (!(await Bun.password.verify(body.password, user.password))) {
 				throw new UnauthorizedError('Invalid email or password');
 			}
 

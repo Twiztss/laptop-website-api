@@ -28,7 +28,6 @@ export const authPlugin = new Elysia({ name: 'auth-plugin' })
 		return { user };
 	})
 	.as('global');
-
 export const isAuthenticated = new Elysia({ name: 'is-authenticated' })
 	.use(authPlugin)
 	.onBeforeHandle(({ user }) => {
@@ -36,7 +35,7 @@ export const isAuthenticated = new Elysia({ name: 'is-authenticated' })
 			throw new UnauthorizedError('Authentication required');
 		}
 	})
-	.as('global');
+	.as('scoped');
 
 export const isAdmin = new Elysia({ name: 'is-admin' })
 	.use(isAuthenticated)
@@ -45,4 +44,4 @@ export const isAdmin = new Elysia({ name: 'is-admin' })
 			throw new UnauthorizedError('Admin role required');
 		}
 	})
-	.as('global');
+	.as('scoped');

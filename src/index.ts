@@ -4,6 +4,7 @@ import productRoute from './routes/product.route';
 import userRoute from './routes/user.route';
 import categoryRoute from './routes/category.route';
 import authRoute from './routes/auth.route';
+import cartRoute from './routes/cart.route';
 import { BadRequestError, errorHandler, NotFoundError, UnauthorizedError } from './lib/error';
 import { authPlugin } from './lib/auth';
 
@@ -25,6 +26,7 @@ const app = new Elysia()
 	.use(productRoute)
 	.use(userRoute)
 	.use(categoryRoute)
+	.use(cartRoute)
 	.get('/', () => 'Hello Elysia')
 	.listen(3000);
 

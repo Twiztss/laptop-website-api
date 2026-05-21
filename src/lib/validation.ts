@@ -76,3 +76,29 @@ export const CategoryProductQuerySchema = t.Object({
 	sortBy: t.Optional(t.String({ pattern: '^(name|price|stock|created_at)$' })),
 	sortOrder: t.Optional(t.String({ pattern: '^(asc|desc)$' })),
 });
+
+export const CartItemBodySchema = t.Object({
+	product_id: t.String({ format: 'uuid' }),
+	quantity: t.Integer({ minimum: 1 }),
+});
+
+export const CartItemUpdateSchema = t.Object({
+	quantity: t.Integer({ minimum: 1 }),
+});
+
+export const CartParamsSchema = t.Object({
+	id: t.String({ format: 'uuid' }),
+});
+
+export const CartItemParamsSchema = t.Object({
+	itemId: t.String({ format: 'uuid' }),
+});
+
+export const BulkCartItemUpdateSchema = t.Object({
+	items: t.Array(
+		t.Object({
+			itemId: t.String({ format: 'uuid' }),
+			quantity: t.Integer({ minimum: 1 }),
+		})
+	),
+});
