@@ -1,4 +1,5 @@
 import { t } from 'elysia';
+import { OrderStatus } from './constants';
 
 export const ProductParamsSchema = t.Object({
 	id: t.String({ format: 'uuid' }),
@@ -101,4 +102,12 @@ export const BulkCartItemUpdateSchema = t.Object({
 			quantity: t.Integer({ minimum: 1 }),
 		})
 	),
+});
+
+export const OrderParamsSchema = t.Object({
+	id: t.String({ format: 'uuid' }),
+});
+
+export const OrderUpdateSchema = t.Object({
+	status: t.Enum(OrderStatus),
 });
