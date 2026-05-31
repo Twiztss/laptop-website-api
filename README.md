@@ -51,6 +51,10 @@
 2. Set up your environment variables by creating a `.env` file in the root directory:
     ```env
     DATABASE_URL="postgres://user:password@host/database"
+    JWT_SECRET="your_super_secret_key"
+    JWT_EXPIRES_IN="7d"
+    RATE_LIMIT=50
+    RATE_LIMIT_DURATION=60000
     ```
 
 ### Development

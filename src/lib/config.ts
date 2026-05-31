@@ -23,7 +23,15 @@ const getEnv = (name: string, validate?: (val: string) => void): string => {
 	return value;
 };
 
+const parseNumber = (val: string | undefined, defaultVal: number): number => {
+	if (val === undefined || val === '') return defaultVal;
+	const parsed = Number(val);
+	return isNaN(parsed) ? defaultVal : parsed;
+};
+
 export const CONFIG = {
 	JWT_SECRET: getEnv('JWT_SECRET'),
 	JWT_EXPIRES_IN: getEnv('JWT_EXPIRES_IN', validateExpiresIn),
+	RATE_LIMIT: parseNumber(process.env.RATE_LIMIT, 50),
+	RATE_LIMIT_DURATION: parseNumber(process.env.RATE_LIMIT_DURATION, 60000),
 };

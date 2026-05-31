@@ -1,5 +1,6 @@
 import { Elysia } from 'elysia';
-import './lib/config'; // Ensure config is loaded early
+import { rateLimit } from 'elysia-rate-limit';
+import { CONFIG } from './lib/config'; // Ensure config is loaded early
 import productRoute from './routes/product.route';
 import userRoute from './routes/user.route';
 import categoryRoute from './routes/category.route';
@@ -10,6 +11,22 @@ import { BadRequestError, errorHandler, NotFoundError, UnauthorizedError } from 
 import { authPlugin } from './lib/auth';
 
 const app = new Elysia()
+	.use(rateLimit({
+		duration: CONFIG.RATE_LIMIT_DURATION,
+		max: CONFIG.RATE_LIMIT,
+		generator: (request) => {
+			// Priority: Vercel headers (proxies) -> server.requestIP (direct) -> fallback
+			const forwardedFor = request.headers.get('x-forwarded-for') || request.headers.get('x-vercel-forwarded-for');
+			if (forwardedFor) {
+				return forwardedFor.split(',')[0].trim();
+			}
+
+			const ip = app.server?.requestIP(request);
+			if (ip) return ip.address;
+
+			return '127.0.0.1';
+		},
+	}))
 	.error({
 		NotFoundError,
 		BadRequestError,
@@ -29,9 +46,12 @@ const app = new Elysia()
 	.use(categoryRoute)
 	.use(cartRoute)
 	.use(orderRoute)
-	.get('/', () => 'Hello Elysia')
-	.listen(3000);
+	.get('/', () => 'Hello Elysia');
 
-console.log(`🦊 Elysia is running at ${app.server?.hostname}:${app.server?.port}`);
+if (process.env.VERCEL !== '1') {
+	const port = Number(process.env.PORT) || 3000;
+	app.listen(port);
+	console.log(`🦊 Elysia is running at ${app.server?.hostname}:${app.server?.port}`);
+}
 
 export default app;
