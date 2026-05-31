@@ -14,15 +14,12 @@ const app = new Elysia()
 	.use(rateLimit({
 		duration: CONFIG.RATE_LIMIT_DURATION,
 		max: CONFIG.RATE_LIMIT,
-		generator: (request) => {
-			// Priority: Vercel headers (proxies) -> server.requestIP (direct) -> fallback
+		generator: (request: Request): string => {
+			// Priority: Vercel headers (proxies)
 			const forwardedFor = request.headers.get('x-forwarded-for') || request.headers.get('x-vercel-forwarded-for');
 			if (forwardedFor) {
 				return forwardedFor.split(',')[0].trim();
 			}
-
-			const ip = app.server?.requestIP(request);
-			if (ip) return ip.address;
 
 			return '127.0.0.1';
 		},
